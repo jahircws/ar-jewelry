@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AR Jewelry Try-On</title>
+
+  <!-- Styles -->
+  <link rel="stylesheet" href="css/style.css" />
+
+  <!-- MediaPipe (loaded before body so models are ready) -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils@0.3.1675466862/camera_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils@0.3.1675466124/drawing_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/hands.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@0.4.1633559619/face_mesh.js" crossorigin="anonymous"></script>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════════════
+     HEADER
+     ══════════════════════════════════════════════════ -->
+<header>
+  <a class="logo" href="#" onclick="showPage('listing'); return false;">Lumi<span>è</span>re</a>
+  <nav>
+    <a onclick="showPage('listing')" id="nav-listing" class="active">Collections</a>
+    <a href="#" onclick="return false">About</a>
+    <a href="#" onclick="return false">Atelier</a>
+  </nav>
+</header>
+
+<!-- ══════════════════════════════════════════════════
+     PAGE: LISTING
+     ══════════════════════════════════════════════════ -->
+<div id="listing-page" class="page active">
+
+  <div class="hero">
+    <h1 class="hero-title">
+      Fine Jewellery,<br>
+      <em>Try Before</em><br>
+      You Treasure
+    </h1>
+    <p class="hero-sub sans">
+      Experience our curated collection through augmented reality.
+      Hold your hand to the camera and see each piece come alive on you.
+    </p>
+  </div>
+
+  <div class="filter-bar">
+    <span class="filter-label sans">Filter</span>
+    <button class="filter-btn active" onclick="filterProducts('all', this)">All</button>
+    <button class="filter-btn"        onclick="filterProducts('ring', this)">Rings</button>
+    <button class="filter-btn"        onclick="filterProducts('bangle', this)">Bangles</button>
+    <button class="filter-btn"        onclick="filterProducts('necklace', this)">Necklaces</button>
+  </div>
+
+  <div class="grid" id="product-grid">
+    <!-- Injected by app.js → renderGrid() -->
+  </div>
+
+  <footer>
+    <div class="footer-logo">Lumi<span>è</span>re</div>
+    <span class="footer-note sans">AR Try-On Demo · MediaPipe Powered</span>
+  </footer>
+
+</div><!-- /listing-page -->
+
+
+<!-- ══════════════════════════════════════════════════
+     PAGE: DETAIL
+     ══════════════════════════════════════════════════ -->
+<div id="detail-page" class="page">
+  <div style="max-width:1200px;margin:0 auto;padding:60px 40px">
+
+    <button class="detail-back sans" onclick="showPage('listing')">
+      ← Back to Collection
+    </button>
+
+    <div class="detail-layout">
+
+      <!-- Product image (PNG or SVG fallback) -->
+      <div class="detail-img-wrap">
+        <div id="detail-img-wrap-inner">
+          <!-- Populated by openDetail() -->
+        </div>
+        <span class="detail-img-label sans">Studio photograph</span>
+      </div>
+
+      <!-- Product info -->
+      <div class="detail-info">
+        <div class="detail-cat  sans" id="detail-cat"></div>
+        <h2  class="detail-name"     id="detail-name"></h2>
+        <div class="detail-metal sans" id="detail-metal"></div>
+        <div class="detail-price sans" id="detail-price"></div>
+        <p   class="detail-desc"     id="detail-desc"></p>
+
+        <div class="detail-specs" id="detail-specs">
+          <!-- Populated by openDetail() -->
+        </div>
+
+        <button class="btn-try" onclick="openAR()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M15 10l-4 4 6 6-4-14-2 8z"/>
+            <circle cx="8" cy="8" r="3"/>
+          </svg>
+          Try It On — AR
+        </button>
+
+        <button class="btn-add sans" onclick="showToast('Added to wishlist ✦')">
+          Add to Wishlist
+        </button>
+      </div>
+
+    </div>
+  </div>
+</div><!-- /detail-page -->
+
+
+<!-- ══════════════════════════════════════════════════
+     AR MODAL
+     ══════════════════════════════════════════════════ -->
+<div id="ar-modal">
+  <div class="ar-container">
+
+    <!-- Header -->
+    <div class="ar-header">
+      <div>
+        <div class="ar-title">Virtual Try-On</div>
+        <div class="ar-product-name sans" id="ar-product-name"></div>
+      </div>
+      <button class="ar-close" onclick="closeAR()">✕</button>
+    </div>
+
+    <!-- Body -->
+    <div class="ar-body">
+
+      <!-- Webcam + Canvas overlay -->
+      <div class="ar-viewport">
+        <video  id="ar-video"  playsinline autoplay muted></video>
+        <canvas id="ar-canvas"></canvas>
+
+        <!-- Loading spinner -->
+        <div class="ar-loading" id="ar-loading">
+          <div class="ar-spinner"></div>
+          <div class="ar-loading-text">Initialising AR Engine…</div>
+        </div>
+
+        <!-- Tracking status -->
+        <div class="ar-status" id="ar-status">Position hand in frame</div>
+      </div>
+
+      <!-- Sidebar -->
+      <div class="ar-sidebar">
+
+        <!-- Currently trying on -->
+        <div class="ar-sidebar-section">
+          <div class="ar-sidebar-label sans">Trying On</div>
+          <div class="ar-item-current">
+            <div class="ar-item-thumb" id="ar-thumb-inner">
+              <!-- Populated by openAR() -->
+            </div>
+            <div>
+              <div class="ar-item-name" id="ar-item-name"></div>
+              <div class="ar-item-cat  sans" id="ar-item-cat"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Scale + Opacity controls -->
+        <div class="ar-sidebar-section">
+          <div class="ar-sidebar-label sans">Adjust</div>
+
+          <div class="ar-adj-row">
+            <span class="ar-adj-label sans">Scale</span>
+            <div class="ar-adj-controls">
+              <button class="ar-adj-btn" onclick="adjustScale(-0.1)">−</button>
+              <span   class="ar-adj-val sans" id="scale-val">1.0×</span>
+              <button class="ar-adj-btn" onclick="adjustScale(0.1)">+</button>
+            </div>
+          </div>
+
+          <div class="ar-adj-row">
+            <span class="ar-adj-label sans">Opacity</span>
+            <div class="ar-adj-controls">
+              <button class="ar-adj-btn" onclick="adjustOpacity(-0.1)">−</button>
+              <span   class="ar-adj-val sans" id="opacity-val">1.0</span>
+              <button class="ar-adj-btn" onclick="adjustOpacity(0.1)">+</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tips -->
+        <div class="ar-tips">
+          <div class="ar-sidebar-label sans">Tips</div>
+
+          <div class="ar-tip">
+            <span class="ar-tip-icon">💡</span>
+            <span class="ar-tip-text sans">Good lighting improves tracking accuracy</span>
+          </div>
+          <div class="ar-tip">
+            <span class="ar-tip-icon">✋</span>
+            <span class="ar-tip-text sans">Keep your hand open and facing the camera</span>
+          </div>
+          <div class="ar-tip">
+            <span class="ar-tip-icon">🔄</span>
+            <span class="ar-tip-text sans">Move slowly for best alignment</span>
+          </div>
+          <div class="ar-tip" id="necklace-tip" style="display:none">
+            <span class="ar-tip-icon">👤</span>
+            <span class="ar-tip-text sans">Face the camera and keep shoulders visible</span>
+          </div>
+        </div>
+
+      </div><!-- /ar-sidebar -->
+    </div><!-- /ar-body -->
+  </div><!-- /ar-container -->
+</div><!-- /ar-modal -->
+
+
+<!-- Toast notification -->
+<div id="toast"></div>
+
+<!-- App logic -->
+<script src="js/app.js"></script>
+
+</body>
+</html>
